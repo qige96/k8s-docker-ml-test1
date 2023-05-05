@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: demo-sklearn-k8s-storage
+spec:
+  template:
+    spec:
+      containers:
+      - name: tdemo-sklearn-k8s-storage
+        imagePullPolicy: Always
+        image: ghcr.io/qige96/k8s-docker-ml-test1:demo-sklearn-with-storage
+        command: ["python3",  "sklearn_job.py"]
+        volumeMounts:
+        - name: data-volume
+          mountPath: /home/jovyan/outputs
+      restartPolicy: Never
+      volumes:
+      - name: data-volume
+        hostPath:
+          path: ~/experiment/outputs/demo-sklearn
+  backoffLimit: 0
+  
