@@ -1,7 +1,7 @@
 Run a Scikit-Learn job in the k8s environment
 =============================================
 
-> Credits to this [blogpost]9https://blog.dataiku.com/how-to-perform-basic-ml-training-with-scikit-learn-docker-and-kubernetes)
+> Credits to this [blogpost](https://blog.dataiku.com/how-to-perform-basic-ml-training-with-scikit-learn-docker-and-kubernetes)
 
 This document outlines the main steps to run a simple machine learning experiment in the kubernetes environment. We will train an SVM classifier on the iris dataset using the `scikit-learn` package, and show the prediction accuracy of the trained model.
 
