@@ -12,7 +12,7 @@ spec:
         command: ["python3",  "sklearn_job.py"]
         volumeMounts:
         - name: data-volume
-          mountPath: /home/jovyan/outputs
+          mountPath: /mydata
       restartPolicy: Never
       volumes:
       - name: data-volume

@@ -34,6 +34,7 @@ from sklearn import svm
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from joblib import dump
 
 # Initialise an SVM classifier
 clf = svm.SVC()
@@ -50,6 +51,11 @@ y_pred = clf.predict(X_test)
 # display results
 print(f'accuracy_score: {accuracy_score(y_test, y_pred)}')
 print("Done!")
+
+# outputs
+dump(clf, 'svc-iris.model')
+with open('report.txt', 'w') as f:
+    f.write(f'accuracy_score: {accuracy_score(y_test, y_pred)}\n')
 ```
 
 ## Step 2: Build a docker image and push to a registry
@@ -60,6 +66,9 @@ Write such a [file](https://docs.docker.com/engine/reference/builder/) called `D
 # Build our image on top of a public data science images
 # https://hub.docker.com/r/jupyter/scipy-notebook/
 From jupyter/scipy-notebook:latest
+
+# the docker runs as the root user
+USER root
 
 # Our image just include the main python script
 COPY sklearn_job.py ./sklearn_job.py
@@ -76,7 +85,7 @@ Dockerfile
 Then, run the following commands to build  the image
 
 ```shell
-docker build --tag demo-sklearn:0.1 .
+docker build --tag demo-sklearn .
 ```
 
 Now we push the image to a registry. There a many hosting services, like docker hub, github, etc. Here I chose github:
@@ -85,7 +94,7 @@ Now we push the image to a registry. There a many hosting services, like docker 
 # before pushing, we need to first login
 docker login ghcr.io --username qige96 --password <Personal_Access_Token>
 # Now we can push
-docker tag demo-sklearn:0.1 ghcr.io/qige96/k8s-docker-ml-test1:demo-sklearn
+docker tag demo-sklearn ghcr.io/qige96/k8s-docker-ml-test1:demo-sklearn
 docker push ghcr.io/qige96/k8s-docker-ml-test1:demo-sklearn
 ```
 
@@ -98,62 +107,46 @@ Now login to the EIDF cluster.
 ssh -J <username>@eidf-gateway.epcc.ed.ac.uk <username>@<cluster-addr>
 ```
 
-To launch a k8s job, we first write [k8s spec file](https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/) called `demo-sklearn.yml`
-
-```yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: demo-sklearn-k8s
-spec:
-  template:
-    spec:
-      containers:
-      - name: tdemo-sklearn-k8s
-        imagePullPolicy: Always
-        image: ghcr.io/qige96/k8s-docker-ml-test1:demo-sklearn
-        command: ["python3",  "train.py"]
-      restartPolicy: Never
-  backoffLimit: 0
-````
-
-Then we can launch the job by one line of command
-
+The simplest way to pull and run our image is:
 ```shell
-kubectl apply -f demo-sklearn.yml --validate=false
+kubectl run demo-sklearn --image=ghcr.io/qige96/k8s-docker-ml-test1:demo-sklearn
 ```
-After launching the k8s job, we can see a pod `demo-sklearn-k8s-mqmjh` created 
-```shell
-rzhu-infk8s@eidf029-host1:~$ kubectl get pods
-NAME                          READY   STATUS              RESTARTS   AGE
-demo-sklearn-k8s-mqmjh        0/1     ContainerCreating   0          6s
-node-info-80gb-full-8-b6f69   0/1     Completed           0          119m
-nvidia-ubuntu-aryo-1x80gpus   1/1     Running             0          29h
-nvidia-ubuntu-aryo-2x80gpus   1/1     Running             0          33h
-```
-After a while, when we see the status of the of `demo-sklearn-k8s-mqmjh` becomes "Completed"
-```shell
-rzhu-infk8s@eidf029-host1:~$ kubectl get pods
-NAME                          READY   STATUS      RESTARTS   AGE
-demo-sklearn-k8s-mqmjh        0/1     Completed   0          2m14s
-node-info-80gb-full-8-b6f69   0/1     Completed   0          121m
-nvidia-ubuntu-aryo-1x80gpus   1/1     Running     0          29h
-```
+The a pod called `demo-sklearn` will be created, running a container made by our image.
 
-We can inspect the command line printing outputs of our sklearn job by displaying the logs of the pod
+Next, we login to the container and run out job.
 
 ```shell
-rzhu-infk8s@eidf029-host1:~$ kubectl logs demo-sklearn-k8s-mqmjh
+rzhu-infk8s@eidf029-host1:~$ kubectl exec -it demo-sklearn -- /bin/bash
+root@demo-sklearn:~#
+```
+From the change of the CLI prompt we can see that now we login to the container. Then we can run our job
+
+```shell
+root@demo-sklearn:~# python sklearn_job.py 
 accuracy_score: 1.0
 Done!
+root@demo-sklearn:~# ls
+report.txt  sklearn_job.py  svc-iris.model
 ```
+
+We can see now we successfully run our ML job, and dump the model file to the container file system. Finally, we are going to move the output files from the container to our cluster directory
+
+```shell
+root@demo-sklearn:~# exit  # disconnect from the container and go back to the cluster
+exit
+rzhu-infk8s@eidf029-host1:~$ kubectl cp demo-sklearn:svc-iris.model ./svc-iric.model
+rzhu-infk8s@eidf029-host1:~$ kubectl cp demo-sklearn:report.txt ./svc-iris-report.txt
+rzhu-infk8s@eidf029-host1:~$ ls
+svc-iric.model  svc-iris-report.txt
+```
+
 
 Clean up
 ----------
-Finally, delete the jobs and pods on the cluster (being a considerate user)
+At last, delete the pods on the cluster (being a considerate user)
 
 ```shell
-kubectl delete jobs demo-sklearn-k8s # the name of our k8s job
+kubectl delete pods demo-sklearn-k8s 
 ```
-This command will delete the job and the related pods.
+This command will delete the pods.
 
