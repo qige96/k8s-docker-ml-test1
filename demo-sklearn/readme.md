@@ -10,12 +10,19 @@ Here is the main workflow
 2. build the project to be a docker image and push the image to a registry
 3. lanuch a k8s job on the EIDF cluster to pull the image and run our ML experiment
 
+Set up
+-------
+1. Have access to the EIDF cluster
+2. Have docker installed on our own laptop
+3. Have an account of an image registry (docker hub, github, etc.)
+
+
 Minimal Experiment
 --------------------
 
 ### Step 1: Prepare the python script
 
-Below is the main python script `sklearn_job.py` that runs our ML job
+Create a project on our ownn laptop. Below is the main python script `sklearn_job.py` that runs our ML job
 
 ```python
 import os
@@ -56,6 +63,14 @@ From jupyter/scipy-notebook:latest
 
 # Our image just include the main python script
 COPY sklearn_job.py ./sklearn_job.py
+```
+
+Now on our own laptop, the project sturcture looks like this 
+
+```shell
+ricky@ricky-pc$ tree .
+sklearn_job.py
+Dockerfile
 ```
 
 Then, run the following commands to build  the image
@@ -102,7 +117,7 @@ spec:
   backoffLimit: 0
 ````
 
-Then we can launch the job by 1 line of command
+Then we can launch the job by one line of command
 
 ```shell
 kubectl apply -f demo-sklearn.yml --validate=false
@@ -116,7 +131,7 @@ node-info-80gb-full-8-b6f69   0/1     Completed           0          119m
 nvidia-ubuntu-aryo-1x80gpus   1/1     Running             0          29h
 nvidia-ubuntu-aryo-2x80gpus   1/1     Running             0          33h
 ```
-After a while, when we see the status of the od `demo-sklearn-k8s-mqmjh` becomes "Completed"
+After a while, when we see the status of the of `demo-sklearn-k8s-mqmjh` becomes "Completed"
 ```shell
 rzhu-infk8s@eidf029-host1:~$ kubectl get pods
 NAME                          READY   STATUS      RESTARTS   AGE
@@ -125,10 +140,20 @@ node-info-80gb-full-8-b6f69   0/1     Completed   0          121m
 nvidia-ubuntu-aryo-1x80gpus   1/1     Running     0          29h
 ```
 
-We can inspect the command line printing outputs by displaying the logs of the pod
+We can inspect the command line printing outputs of our sklearn job by displaying the logs of the pod
 
 ```shell
 rzhu-infk8s@eidf029-host1:~$ kubectl logs demo-sklearn-k8s-mqmjh
 accuracy_score: 1.0
 Done!
 ```
+
+Clean up
+----------
+Finally, delete the jobs and pods on the cluster (being a considerate user)
+
+```shell
+kubectl delete jobs demo-sklearn-k8s # the name of our k8s job
+```
+This command will delete the job and the related pods.
+
